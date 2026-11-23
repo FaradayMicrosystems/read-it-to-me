@@ -16,6 +16,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
@@ -38,6 +39,7 @@ import com.faradaymicrosystems.nobodygenerator.data.Recording
 fun LibraryScreen(
     recordings: List<Recording>,
     player: PlayerState,
+    bookmarks: Map<String, Int>,
     onPlay: (Recording) -> Unit,
     onSeek: (Int) -> Unit,
     onSkip: (Int) -> Unit,
@@ -77,11 +79,21 @@ fun LibraryScreen(
                     ) {
                         Column(Modifier.padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 4.dp)) {
                             Text(rec.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            val leftOff = if (isCurrent) player.positionMs.takeIf { it > 0 } else bookmarks[rec.file.name]
                             Text(
-                                "${formatTime(rec.durationMs.toInt())} · ${formatSize(rec.sizeBytes)}",
+                                buildString {
+                                    if (leftOff != null) append("${formatTime(leftOff)} of ")
+                                    append("${formatTime(rec.durationMs.toInt())} · ${formatSize(rec.sizeBytes)}")
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                            if (leftOff != null && rec.durationMs > 0) {
+                                LinearProgressIndicator(
+                                    progress = { (leftOff / rec.durationMs.toFloat()).coerceIn(0f, 1f) },
+                                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp, end = 12.dp),
+                                )
+                            }
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 IconButton(onClick = { onPlay(rec) }) {
                                     Icon(

@@ -1,6 +1,7 @@
 package com.faradaymicrosystems.nobodygenerator.ui
 
 import android.media.MediaPlayer
+import com.faradaymicrosystems.nobodygenerator.data.Bookmarks
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -19,10 +20,18 @@ data class PlayerState(
     val speed: Float = 1.0f,
 )
 
-/** Plays one MP3 at a time inside the app. Speed carries over from track to track. */
-class Player(private val scope: CoroutineScope, initialSpeed: Float = 1.0f) {
+/**
+ * Plays one MP3 at a time inside the app. Speed carries over from track to track, and each
+ * track resumes where it was last left (see [Bookmarks]).
+ */
+class Player(
+    private val scope: CoroutineScope,
+    initialSpeed: Float = 1.0f,
+    private val bookmarks: Bookmarks? = null,
+) {
     private var mp: MediaPlayer? = null
     private var ticker: Job? = null
+    private var lastSavedAt = 0L
     private var speed = initialSpeed
     private val _state = MutableStateFlow(PlayerState(speed = speed))
     val state: StateFlow<PlayerState> = _state
@@ -44,6 +53,7 @@ class Player(private val scope: CoroutineScope, initialSpeed: Float = 1.0f) {
         if (current != null && _state.value.file == file) {
             if (current.isPlaying) {
                 current.pause()
+                bookmark()
             } else {
                 current.start()
                 applySpeed(current)
@@ -59,18 +69,22 @@ class Player(private val scope: CoroutineScope, initialSpeed: Float = 1.0f) {
             setOnCompletionListener {
                 _state.value = _state.value.copy(playing = false, positionMs = 0)
                 seekTo(0)
+                bookmarks?.clear(file.name)
             }
-            start()
         }
+        val resume = bookmarks?.resumeAt(file.name, player.duration) ?: 0
+        if (resume > 0) player.seekTo(resume)
+        player.start()
         applySpeed(player)
         mp = player
-        _state.value = PlayerState(file, title, true, 0, player.duration, speed)
+        _state.value = PlayerState(file, title, true, resume, player.duration, speed)
         tick()
     }
 
     fun seekTo(ms: Int) {
         mp?.seekTo(ms)
         _state.value = _state.value.copy(positionMs = ms)
+        bookmark(ms)
     }
 
     fun skip(deltaMs: Int) {
@@ -90,16 +104,34 @@ class Player(private val scope: CoroutineScope, initialSpeed: Float = 1.0f) {
                 runCatching {
                     _state.value = _state.value.copy(positionMs = p.currentPosition, playing = p.isPlaying)
                 }
+                // Save every few seconds so the spot survives the app being closed or killed.
+                val now = System.currentTimeMillis()
+                if (now - lastSavedAt >= SAVE_EVERY_MS) {
+                    lastSavedAt = now
+                    bookmark()
+                }
                 if (!p.isPlaying) break
                 delay(250)
             }
         }
     }
 
+    /** Saves the current spot for the loaded track. */
+    fun bookmark(positionMs: Int? = null) {
+        val p = mp ?: return
+        val file = _state.value.file ?: return
+        runCatching { bookmarks?.record(file.name, positionMs ?: p.currentPosition, p.duration) }
+    }
+
     fun release() {
         ticker?.cancel()
+        bookmark()
         mp?.release()
         mp = null
         _state.value = PlayerState(speed = speed)
+    }
+
+    private companion object {
+        const val SAVE_EVERY_MS = 5_000L
     }
 }

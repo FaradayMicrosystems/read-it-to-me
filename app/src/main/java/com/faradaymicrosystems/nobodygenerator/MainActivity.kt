@@ -66,6 +66,7 @@ class MainActivity : ComponentActivity() {
                 val job by vm.job.collectAsStateWithLifecycle()
                 val recordings by vm.recordings.collectAsStateWithLifecycle()
                 val player by vm.player.state.collectAsStateWithLifecycle()
+                val bookmarks by vm.bookmarks.positions.collectAsStateWithLifecycle()
                 val snackbar = remember { SnackbarHostState() }
                 LaunchedEffect(ui.message) {
                     ui.message?.let {
@@ -121,6 +122,7 @@ class MainActivity : ComponentActivity() {
                         LibraryScreen(
                             recordings = recordings,
                             player = player,
+                            bookmarks = bookmarks,
                             onPlay = { rec -> runCatching { vm.player.toggle(rec.file, rec.title) } },
                             onSeek = vm.player::seekTo,
                             onSkip = vm.player::skip,
@@ -161,6 +163,12 @@ class MainActivity : ComponentActivity() {
             vm.handleIncoming(intent)
             tab = 0
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Keep the listening spot even if Android kills the app while it's in the background.
+        vm.player.bookmark()
     }
 
     private fun share(rec: Recording) {

@@ -9,6 +9,8 @@ import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.faradaymicrosystems.nobodygenerator.audio.PcmPlayer
+import com.faradaymicrosystems.nobodygenerator.data.Bookmarks
+import com.faradaymicrosystems.nobodygenerator.data.PrefsPositionStore
 import com.faradaymicrosystems.nobodygenerator.data.Library
 import com.faradaymicrosystems.nobodygenerator.data.Recording
 import com.faradaymicrosystems.nobodygenerator.service.GenerateService
@@ -68,7 +70,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _recordings = MutableStateFlow<List<Recording>>(emptyList())
     val recordings: StateFlow<List<Recording>> = _recordings
 
-    val player = Player(viewModelScope, prefs.getFloat("playbackSpeed", 1.0f))
+    val bookmarks = Bookmarks(PrefsPositionStore(app))
+    val player = Player(viewModelScope, prefs.getFloat("playbackSpeed", 1.0f), bookmarks)
     private var synth: Synthesizer? = null
     private var systemReady = false
     private var systemError: String? = null
@@ -247,6 +250,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun delete(rec: Recording) {
         player.stopIf(rec.file)
+        bookmarks.clear(rec.file.name)
         rec.file.delete()
         Library.changed()
     }

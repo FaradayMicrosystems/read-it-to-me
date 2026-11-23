@@ -13,7 +13,7 @@ plugins {
 val versionCodeOffset = 1000
 val buildNumber = versionCodeOffset + (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
 val channel = System.getenv("NOBODY_CHANNEL") ?: "release"
-val baseVersion = "0.2.0"
+val baseVersion = "0.2.1"
 
 val keystoreFile = file("nobody.jks")
 
