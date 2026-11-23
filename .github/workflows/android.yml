@@ -35,12 +35,15 @@ jobs:
         env:
           KS_B64: ${{ secrets.NOBODY_KEYSTORE_B64 }}
         run: |
-          if [ -n "$KS_B64" ]; then
-            echo "$KS_B64" | base64 -d > app/nobody.jks
-            echo "Signing with the release key"
-          else
-            echo "::warning::No signing key secret set; using a throwaway debug key (updates won't install over each other)"
+          # Never ship a debug-signed APK: it won't install over the existing app.
+          if [ -z "$KS_B64" ] || [ -z "$NOBODY_KS_PASS" ]; then
+            echo "::error::Signing secrets NOBODY_KEYSTORE_B64 / NOBODY_KS_PASS are not set on this repo. Refusing to publish a debug-signed APK."
+            exit 1
           fi
+          echo "$KS_B64" | base64 -d > app/nobody.jks
+          keytool -list -keystore app/nobody.jks -storepass "$NOBODY_KS_PASS" -alias nobody > /dev/null \
+            || { echo "::error::Keystore or password is wrong"; exit 1; }
+          echo "Signing with the release key"
 
       - name: Unit tests
         run: gradle --no-daemon testReleaseUnitTest

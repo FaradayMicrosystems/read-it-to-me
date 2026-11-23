@@ -5,9 +5,12 @@ plugins {
 }
 
 // CI passes the run number so every build installs over the previous one.
-val buildNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
+// Offset by 1000: the repo was recreated (run numbers restarted at 1), and builds
+// from the old NobodyGenerator repo had higher version codes. Never lower this.
+val versionCodeOffset = 1000
+val buildNumber = versionCodeOffset + (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
 val channel = System.getenv("NOBODY_CHANNEL") ?: "release"
-val baseVersion = "0.1.1"
+val baseVersion = "0.1.2"
 
 val keystoreFile = file("nobody.jks")
 
