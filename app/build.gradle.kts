@@ -22,6 +22,8 @@ android {
         versionCode = buildNumber
         versionName = if (channel == "release") baseVersion else "$baseVersion-exp.$buildNumber"
 
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
@@ -98,4 +100,6 @@ dependencies {
     implementation("net.dankito.readability4j:readability4j:1.0.8")
 
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 }
