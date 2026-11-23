@@ -43,6 +43,9 @@ jobs:
           # Strip whitespace/line breaks that sneak in when pasting the secret.
           KS_B64=$(printf %s "$KS_B64" | tr -d ' \r\n\t')
           NOBODY_KS_PASS=$(printf %s "$NOBODY_KS_PASS" | tr -d ' \r\n\t')
+          # A JKS keystore's base64 always starts with "/u3+7Q" (magic FEEDFEED);
+          # pasting into the secret box has dropped the leading "/" before. Restore it.
+          case "$KS_B64" in u3+7Q*) KS_B64="/$KS_B64"; echo "Restored dropped leading '/'";; esac
           # Safe diagnostics: lengths + short hash fingerprints only, never the values.
           echo "Keystore secret: ${#KS_B64} chars, fingerprint $(printf %s "$KS_B64" | sha256sum | cut -c1-16)"
           echo "Password secret: ${#NOBODY_KS_PASS} chars, fingerprint $(printf %s "$NOBODY_KS_PASS" | sha256sum | cut -c1-16)"
