@@ -41,9 +41,13 @@ jobs:
             exit 1
           fi
           # Strip whitespace/line breaks that sneak in when pasting the secret.
-          printf %s "$KS_B64" | tr -d ' \r\n\t' | base64 -d > app/nobody.jks \
-            || { echo "::error::NOBODY_KEYSTORE_B64 is not valid base64 (paste may be truncated)"; exit 1; }
+          KS_B64=$(printf %s "$KS_B64" | tr -d ' \r\n\t')
           NOBODY_KS_PASS=$(printf %s "$NOBODY_KS_PASS" | tr -d ' \r\n\t')
+          # Safe diagnostics: lengths + short hash fingerprints only, never the values.
+          echo "Keystore secret: ${#KS_B64} chars, fingerprint $(printf %s "$KS_B64" | sha256sum | cut -c1-16)"
+          echo "Password secret: ${#NOBODY_KS_PASS} chars, fingerprint $(printf %s "$NOBODY_KS_PASS" | sha256sum | cut -c1-16)"
+          printf %s "$KS_B64" | base64 -d > app/nobody.jks \
+            || { echo "::error::NOBODY_KEYSTORE_B64 is not valid base64 (paste may be truncated or the wrong file)"; exit 1; }
           echo "::add-mask::$NOBODY_KS_PASS"
           echo "NOBODY_KS_PASS=$NOBODY_KS_PASS" >> "$GITHUB_ENV"
           keytool -list -keystore app/nobody.jks -storepass "$NOBODY_KS_PASS" -alias nobody > /dev/null \
