@@ -4,7 +4,7 @@ import java.io.Closeable
 
 /** Streams mono 16-bit PCM into MP3 using the bundled LAME library. */
 class Mp3Encoder(sampleRate: Int, kbps: Int = 64, title: String? = null) : Closeable {
-    private var handle: Long = nativeInit(sampleRate, kbps, title, "NobodyGenerator")
+    private var handle: Long = nativeInit(sampleRate, kbps, title, "Read It To Me")
 
     init {
         check(handle != 0L) { "MP3 encoder failed to start" }

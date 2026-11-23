@@ -69,7 +69,7 @@ fun CreateScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text("NobodyGenerator", style = MaterialTheme.typography.headlineMedium)
+        Text("Read It To Me", style = MaterialTheme.typography.headlineMedium)
         Text(
             "Add a document, hit Go, and get an MP3 you can play here or save.",
             style = MaterialTheme.typography.bodyMedium,
@@ -163,8 +163,7 @@ fun CreateScreen(
                         }
                     }
                 }
-                Text("Speed  ${"%.2f".format(ui.rate)}×", style = MaterialTheme.typography.bodyMedium)
-                Slider(value = ui.rate, onValueChange = onRate, valueRange = 0.5f..2.0f, steps = 5, enabled = !running)
+                SpeedControl(value = ui.rate, onChange = onRate, range = 0.5f..2.0f, enabled = !running)
                 Text("Pitch  ${"%.2f".format(ui.pitch)}", style = MaterialTheme.typography.bodyMedium)
                 Slider(value = ui.pitch, onValueChange = onPitch, valueRange = 0.6f..1.6f, steps = 9, enabled = !running)
                 OutlinedButton(onClick = onPreview, enabled = ui.engineReady && !running) {

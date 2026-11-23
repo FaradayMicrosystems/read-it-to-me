@@ -1,4 +1,4 @@
-# NobodyGenerator — Project Proposal (v2: Android app)
+# Read It To Me (formerly NobodyGenerator) — Project Proposal (v2: Android app)
 
 **Status:** In progress · **Branch:** `experimental` · **Updated:** 2026-11-23
 

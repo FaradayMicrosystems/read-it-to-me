@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "NobodyGenerator"
+rootProject.name = "ReadItToMe"
 include(":app")

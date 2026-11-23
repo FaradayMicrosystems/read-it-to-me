@@ -68,7 +68,7 @@ class OnDevicePipelineTest {
             val voice = VoiceCatalog.defaultVoice(options)
             synth.configure(voice?.name, 1.0f, 1.0f)
             val wav = File(context.cacheDir, "t.wav")
-            synth.toFile("G'day. This is a test of the NobodyGenerator speech pipeline.", wav)
+            synth.toFile("G'day. This is a test of the Read It To Me speech pipeline.", wav)
             val pcm = WavReader.read(wav)
             Log.i("NobodyTest", "WAV: ${pcm.sampleRate} Hz, ${pcm.samples.size} samples")
             assertTrue("too little audio", pcm.samples.size > pcm.sampleRate)

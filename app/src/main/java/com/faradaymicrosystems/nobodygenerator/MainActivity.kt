@@ -121,6 +121,7 @@ class MainActivity : ComponentActivity() {
                             onPlay = { rec -> runCatching { vm.player.toggle(rec.file, rec.title) } },
                             onSeek = vm.player::seekTo,
                             onSkip = vm.player::skip,
+                            onSpeed = vm::setPlaybackSpeed,
                             onSave = { rec ->
                                 vm.pendingExport = rec
                                 saveDocument.launch("${rec.title}.mp3")

@@ -60,7 +60,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _recordings = MutableStateFlow<List<Recording>>(emptyList())
     val recordings: StateFlow<List<Recording>> = _recordings
 
-    val player = Player(viewModelScope)
+    val player = Player(viewModelScope, prefs.getFloat("playbackSpeed", 1.0f))
     private var synth: Synthesizer? = null
     var pendingExport: Recording? = null
 
@@ -108,6 +108,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setRate(v: Float) {
         prefs.edit().putFloat("rate", v).apply()
         _ui.update { it.copy(rate = v) }
+    }
+
+    fun setPlaybackSpeed(v: Float) {
+        prefs.edit().putFloat("playbackSpeed", v).apply()
+        player.setSpeed(v)
     }
 
     fun setPitch(v: Float) {

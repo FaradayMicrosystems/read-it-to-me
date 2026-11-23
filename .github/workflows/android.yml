@@ -38,7 +38,7 @@ jobs:
         run: |
           if [ -n "$KS_B64" ]; then
             echo "$KS_B64" | base64 -d > app/nobody.jks
-            echo "Signing with the NobodyGenerator key"
+            echo "Signing with the release key"
           else
             echo "::warning::No signing key secret set; using a throwaway debug key (updates won't install over each other)"
           fi
@@ -55,15 +55,15 @@ jobs:
           if [ "$NOBODY_CHANNEL" = "release" ]; then
             VERSION=$(sed -n 's/^val baseVersion = "\(.*\)"/\1/p' app/build.gradle.kts)
             TAG="v${VERSION}"
-            NAME="NobodyGenerator ${TAG}"
+            NAME="Read It To Me ${TAG}"
           else
             TAG="exp-${GITHUB_RUN_NUMBER}"
             NAME="Experimental build ${GITHUB_RUN_NUMBER}"
           fi
-          cp app/build/outputs/apk/release/app-release.apk "NobodyGenerator-${TAG}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "ReadItToMe-${TAG}.apk"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
-          echo "file=NobodyGenerator-${TAG}.apk" >> "$GITHUB_OUTPUT"
+          echo "file=ReadItToMe-${TAG}.apk" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:

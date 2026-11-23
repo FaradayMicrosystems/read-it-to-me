@@ -41,6 +41,7 @@ fun LibraryScreen(
     onPlay: (Recording) -> Unit,
     onSeek: (Int) -> Unit,
     onSkip: (Int) -> Unit,
+    onSpeed: (Float) -> Unit,
     onSave: (Recording) -> Unit,
     onShare: (Recording) -> Unit,
     onDelete: (Recording) -> Unit,
@@ -128,6 +129,7 @@ fun LibraryScreen(
                         }
                         TextButton(onClick = { onSkip(30_000) }) { Text("+30s") }
                     }
+                    SpeedControl(value = player.speed, onChange = onSpeed, range = 0.5f..3.0f)
                 }
             }
         }

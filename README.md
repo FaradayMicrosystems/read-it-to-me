@@ -1,4 +1,4 @@
-# NobodyGenerator
+# Read It To Me
 
 An Android app that reads your documents aloud and gives you an MP3.
 
@@ -7,7 +7,7 @@ An Android app that reads your documents aloud and gives you an MP3.
 - Australian English voice by default (uses your phone's built-in offline neural voices)
 - Handles messy formatting: Markdown symbols, PDF line-wraps, headers and footers, and web page clutter are cleaned up before reading
 - Runs in the background with a progress notification
-- Built-in player, plus Save to any folder and Share
+- Built-in player with fine speed control (0.05× steps, 0.5×–3×), plus Save to any folder and Share
 
 ## Install
 

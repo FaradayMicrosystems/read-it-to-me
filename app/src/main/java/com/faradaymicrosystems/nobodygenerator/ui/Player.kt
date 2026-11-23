@@ -16,19 +16,38 @@ data class PlayerState(
     val playing: Boolean = false,
     val positionMs: Int = 0,
     val durationMs: Int = 0,
+    val speed: Float = 1.0f,
 )
 
-/** Plays one MP3 at a time inside the app. */
-class Player(private val scope: CoroutineScope) {
+/** Plays one MP3 at a time inside the app. Speed carries over from track to track. */
+class Player(private val scope: CoroutineScope, initialSpeed: Float = 1.0f) {
     private var mp: MediaPlayer? = null
     private var ticker: Job? = null
-    private val _state = MutableStateFlow(PlayerState())
+    private var speed = initialSpeed
+    private val _state = MutableStateFlow(PlayerState(speed = speed))
     val state: StateFlow<PlayerState> = _state
+
+    fun setSpeed(v: Float) {
+        speed = v
+        _state.value = _state.value.copy(speed = v)
+        // Setting PlaybackParams on a paused MediaPlayer un-pauses it, so only apply while playing;
+        // a paused track picks the new speed up when it resumes.
+        mp?.let { if (it.isPlaying) applySpeed(it) }
+    }
+
+    private fun applySpeed(p: MediaPlayer) {
+        runCatching { p.playbackParams = p.playbackParams.setSpeed(speed) }
+    }
 
     fun toggle(file: File, title: String) {
         val current = mp
         if (current != null && _state.value.file == file) {
-            if (current.isPlaying) current.pause() else current.start()
+            if (current.isPlaying) {
+                current.pause()
+            } else {
+                current.start()
+                applySpeed(current)
+            }
             _state.value = _state.value.copy(playing = current.isPlaying)
             if (current.isPlaying) tick()
             return
@@ -43,8 +62,9 @@ class Player(private val scope: CoroutineScope) {
             }
             start()
         }
+        applySpeed(player)
         mp = player
-        _state.value = PlayerState(file, title, true, 0, player.duration)
+        _state.value = PlayerState(file, title, true, 0, player.duration, speed)
         tick()
     }
 
@@ -80,6 +100,6 @@ class Player(private val scope: CoroutineScope) {
         ticker?.cancel()
         mp?.release()
         mp = null
-        _state.value = PlayerState()
+        _state.value = PlayerState(speed = speed)
     }
 }
