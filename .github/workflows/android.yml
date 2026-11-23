@@ -53,7 +53,8 @@ jobs:
         id: apk
         run: |
           if [ "$NOBODY_CHANNEL" = "release" ]; then
-            TAG="v0.1.0-build${GITHUB_RUN_NUMBER}"
+            VERSION=$(sed -n 's/^val baseVersion = "\(.*\)"/\1/p' app/build.gradle.kts)
+            TAG="v${VERSION}"
             NAME="NobodyGenerator ${TAG}"
           else
             TAG="exp-${GITHUB_RUN_NUMBER}"
