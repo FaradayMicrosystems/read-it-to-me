@@ -112,6 +112,9 @@ class MainActivity : ComponentActivity() {
                                 tab = 1
                             },
                             onGetVoices = ::openSpeechSettings,
+                            onDownloadNatural = vm::downloadNaturalVoices,
+                            onCancelNatural = vm::cancelNaturalVoices,
+                            onRemoveNatural = vm::removeNaturalVoices,
                             modifier = Modifier.padding(padding),
                         )
                     } else {

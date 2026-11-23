@@ -9,6 +9,9 @@ import com.faradaymicrosystems.nobodygenerator.audio.Mp3Encoder
 import com.faradaymicrosystems.nobodygenerator.audio.WavReader
 import com.faradaymicrosystems.nobodygenerator.text.DocumentLoader
 import com.faradaymicrosystems.nobodygenerator.text.Source
+import com.faradaymicrosystems.nobodygenerator.tts.KokoroModel
+import com.faradaymicrosystems.nobodygenerator.tts.KokoroVoices
+import com.faradaymicrosystems.nobodygenerator.tts.SpeechEngine
 import com.faradaymicrosystems.nobodygenerator.tts.Synthesizer
 import com.faradaymicrosystems.nobodygenerator.tts.VoiceCatalog
 import kotlinx.coroutines.runBlocking
@@ -76,6 +79,31 @@ class OnDevicePipelineTest {
             assertTrue(mp3.size > 2000)
         } finally {
             synth.shutdown()
+        }
+    }
+
+    /**
+     * Downloads + installs the natural voices for real, then speaks a sentence full of names and
+     * numbers. Guards against sherpa-onnx versions that silently drop unknown words: the full
+     * sentence is ~9 s of audio; with words dropped it's under 5 s.
+     */
+    @Test
+    fun naturalVoiceInstallsAndSpeaksEveryWord() = runBlocking {
+        val t0 = System.currentTimeMillis()
+        KokoroModel.install(context)
+        Log.i("NobodyTest", "Natural voices installed in ${(System.currentTimeMillis() - t0) / 1000}s")
+        assertTrue(KokoroModel.isReady(context))
+
+        val text = "Kuznetsov tested CachyOS and Ryoku in Toowoomba on the 23rd of November 2026, paying \$4.50 at 3:15 pm."
+        SpeechEngine.open(context, KokoroVoices.default.optionName, 1.0f, 1.0f).use { engine ->
+            val t1 = System.currentTimeMillis()
+            val pcm = engine.synthesize(text)!!
+            val seconds = pcm.samples.size.toFloat() / pcm.sampleRate
+            val took = (System.currentTimeMillis() - t1) / 1000f
+            Log.i("NobodyTest", "Kokoro: ${pcm.sampleRate} Hz, %.1fs audio in %.1fs".format(seconds, took))
+            assertTrue("words were dropped: only %.1fs of audio".format(seconds), seconds > 7f)
+            val mp3 = Mp3Encoder(pcm.sampleRate, 64, "k").use { it.encode(pcm.samples) + it.flush() }
+            assertTrue(mp3.size > 20_000)
         }
     }
 }

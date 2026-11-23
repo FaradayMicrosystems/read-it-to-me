@@ -8,11 +8,16 @@ import android.os.Build
 import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.faradaymicrosystems.nobodygenerator.audio.PcmPlayer
 import com.faradaymicrosystems.nobodygenerator.data.Library
 import com.faradaymicrosystems.nobodygenerator.data.Recording
 import com.faradaymicrosystems.nobodygenerator.service.GenerateService
 import com.faradaymicrosystems.nobodygenerator.service.JobState
 import com.faradaymicrosystems.nobodygenerator.service.Jobs
+import com.faradaymicrosystems.nobodygenerator.service.VoiceDownloadService
+import com.faradaymicrosystems.nobodygenerator.tts.KokoroModel
+import com.faradaymicrosystems.nobodygenerator.tts.KokoroVoices
+import com.faradaymicrosystems.nobodygenerator.tts.SpeechEngine
 import com.faradaymicrosystems.nobodygenerator.text.DocumentLoader
 import com.faradaymicrosystems.nobodygenerator.text.Source
 import com.faradaymicrosystems.nobodygenerator.tts.Synthesizer
@@ -39,8 +44,11 @@ data class UiState(
     val engineReady: Boolean = false,
     val engineError: String? = null,
     val message: String? = null,
+    val natural: KokoroModel.State = KokoroModel.State.NotInstalled,
+    val previewing: Boolean = false,
 ) {
     val selectedVoice: VoiceOption? get() = voices.firstOrNull { it.name == voiceName }
+    val naturalSelected: Boolean get() = selectedVoice?.natural == true
     val hasAustralian: Boolean get() = VoiceCatalog.hasAustralian(voices)
     val canGo: Boolean get() = engineReady && (picked != null || input.isNotBlank())
 }
@@ -62,32 +70,65 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val player = Player(viewModelScope, prefs.getFloat("playbackSpeed", 1.0f))
     private var synth: Synthesizer? = null
+    private var systemReady = false
+    private var systemError: String? = null
     var pendingExport: Recording? = null
 
     init {
+        KokoroModel.refresh(app)
         viewModelScope.launch {
             try {
                 synth = Synthesizer.create(app)
-                refreshVoices()
             } catch (e: Exception) {
-                _ui.update { it.copy(engineError = e.message) }
+                systemError = e.message
+            }
+            systemReady = true
+            refreshVoices()
+        }
+        viewModelScope.launch {
+            var previous: KokoroModel.State? = null
+            KokoroModel.state.collect { s ->
+                _ui.update { it.copy(natural = s) }
+                val justInstalled = s is KokoroModel.State.Ready &&
+                    (previous is KokoroModel.State.Downloading || previous is KokoroModel.State.Installing)
+                if (s is KokoroModel.State.Ready || previous is KokoroModel.State.Ready) refreshVoices()
+                // First install: switch to the natural default voice (British Emma).
+                if (justInstalled) setVoice(KokoroVoices.default.optionName)
+                previous = s
             }
         }
         viewModelScope.launch { Library.version.collect { refreshRecordings() } }
     }
 
     fun refreshVoices() {
-        val s = synth ?: return
-        val options = VoiceCatalog.options(s.voices())
+        if (!systemReady) return
+        val natural = if (KokoroModel.isReady(getApplication())) VoiceCatalog.naturalOptions() else emptyList()
+        val system = synth?.let { VoiceCatalog.options(it.voices()) } ?: emptyList()
+        val options = natural + system
         _ui.update { state ->
             val keep = options.any { it.name == state.voiceName }
             state.copy(
                 voices = options,
                 voiceName = if (keep) state.voiceName else VoiceCatalog.defaultVoice(options)?.name,
                 engineReady = true,
-                engineError = if (options.isEmpty()) "No English voices are installed on this phone." else null,
+                engineError = when {
+                    options.isNotEmpty() -> null
+                    systemError != null -> systemError
+                    else -> "No English voices are installed on this phone."
+                },
             )
         }
+    }
+
+    fun downloadNaturalVoices() = VoiceDownloadService.start(getApplication())
+    fun cancelNaturalVoices() = VoiceDownloadService.cancel(getApplication())
+
+    fun removeNaturalVoices() {
+        if (job.value is JobState.Running) return
+        if (_ui.value.naturalSelected) _ui.update { it.copy(voiceName = null) }
+        KokoroModel.remove(getApplication())
+        refreshVoices()
+        _ui.value.voiceName?.let { setVoice(it) }
     }
 
     fun refreshRecordings() {
@@ -121,10 +162,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun preview() {
-        val s = synth ?: return
         val st = _ui.value
+        if (st.naturalSelected) {
+            if (st.previewing) return
+            _ui.update { it.copy(previewing = true) }
+            viewModelScope.launch {
+                try {
+                    val pcm = withContext(Dispatchers.Default) {
+                        SpeechEngine.open(getApplication(), st.voiceName, st.rate, st.pitch).use { it.synthesize(SAMPLE) }
+                    }
+                    if (pcm != null) PcmPlayer.play(pcm) else _ui.update { it.copy(message = "That voice didn't make any sound.") }
+                } catch (e: Exception) {
+                    _ui.update { it.copy(message = "Couldn't play the sample: ${e.message}") }
+                } finally {
+                    _ui.update { it.copy(previewing = false) }
+                }
+            }
+            return
+        }
+        val s = synth ?: return
+        PcmPlayer.stop()
         s.configure(st.voiceName, st.rate, st.pitch)
-        s.speak("G'day. This is how your documents will sound when I read them to you.")
+        s.speak(SAMPLE)
     }
 
     /** Copies a picked or shared document into the app, so it can be read even after the picker's permission ends. */
@@ -179,6 +238,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
         player.release()
         synth?.stop()
+        PcmPlayer.stop()
         GenerateService.start(app, source, st.voiceName, st.rate, st.pitch)
     }
 
@@ -230,7 +290,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     override fun onCleared() {
+        PcmPlayer.stop()
         player.release()
         synth?.shutdown()
+    }
+
+    private companion object {
+        const val SAMPLE = "G'day. This is how your documents will sound when I read them to you."
     }
 }

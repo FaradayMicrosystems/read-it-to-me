@@ -11,12 +11,13 @@ import android.util.Log
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.faradaymicrosystems.nobodygenerator.audio.Mp3Encoder
+import com.faradaymicrosystems.nobodygenerator.audio.Pcm
 import com.faradaymicrosystems.nobodygenerator.audio.WavReader
 import com.faradaymicrosystems.nobodygenerator.data.Library
 import com.faradaymicrosystems.nobodygenerator.text.DocumentLoader
 import com.faradaymicrosystems.nobodygenerator.text.Source
 import com.faradaymicrosystems.nobodygenerator.text.SpeechText
-import com.faradaymicrosystems.nobodygenerator.tts.Synthesizer
+import com.faradaymicrosystems.nobodygenerator.tts.SpeechEngine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -76,14 +77,12 @@ class GenerateService : Service() {
         if (doc.segments.isEmpty()) throw IllegalStateException("Couldn't find any readable text in that.")
         val title = doc.title
 
-        val synth = Synthesizer.create(this)
+        val engine = SpeechEngine.open(this, req.voiceName, req.rate, req.pitch)
         var encoder: Mp3Encoder? = null
         val partial = File(Library.dir(this), ".partial-${System.currentTimeMillis()}.mp3")
-        val wav = File(cacheDir, "chunk.wav")
         var finished = false
         try {
-            synth.configure(req.voiceName, req.rate, req.pitch)
-            val max = synth.maxInputLength
+            val max = engine.maxChunk
             val pieces = doc.segments.flatMap { seg ->
                 val parts = SpeechText.chunk(seg.text, max)
                 parts.mapIndexed { i, p -> p to if (i == parts.lastIndex) seg.pauseAfterMs else 120 }
@@ -100,11 +99,11 @@ class GenerateService : Service() {
                         progress(title, "Speaking part ${index + 1} of ${pieces.size}", index, pieces.size)
                     }
                     val (text, pauseMs) = piece
-                    if (!speakToWav(synth, text, wav)) {
+                    val pcm = speak(engine, text)
+                    if (pcm == null) {
                         skipped++
                         continue
                     }
-                    val pcm = WavReader.read(wav)
                     val enc = encoder ?: Mp3Encoder(pcm.sampleRate, KBPS, title).also {
                         encoder = it
                         encoderRate = pcm.sampleRate
@@ -129,20 +128,17 @@ class GenerateService : Service() {
             Notifications.finished(this, title)
         } finally {
             encoder?.close()
-            synth.shutdown()
-            wav.delete()
+            engine.close()
             partial.delete() // already renamed away when finished; otherwise discard the half-made file
             if (!finished) Log.i(TAG, "Discarded unfinished recording")
         }
     }
 
     /** One retry, because engines occasionally drop a request. */
-    private suspend fun speakToWav(synth: Synthesizer, text: String, wav: File): Boolean {
+    private suspend fun speak(engine: SpeechEngine, text: String): Pcm? {
         repeat(2) { attempt ->
             try {
-                wav.delete()
-                synth.toFile(text, wav)
-                if (wav.length() > 44) return true
+                engine.synthesize(text)?.let { if (it.samples.isNotEmpty()) return it }
             } catch (e: CancellationException) {
                 coroutineContext.ensureActive() // real cancel -> rethrows; timeout -> retry
             } catch (e: Exception) {
@@ -150,7 +146,7 @@ class GenerateService : Service() {
                 if (attempt == 1 && e.message?.contains("internet") == true) throw e
             }
         }
-        return false
+        return null
     }
 
     private fun progress(title: String, stage: String, done: Int, total: Int) {

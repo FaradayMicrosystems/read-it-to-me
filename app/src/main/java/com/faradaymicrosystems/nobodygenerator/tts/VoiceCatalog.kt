@@ -9,6 +9,8 @@ data class VoiceOption(
     val country: String,
     val offline: Boolean,
     val quality: Int,
+    /** Offline neural (Kokoro) voice rather than one of the phone's own. */
+    val natural: Boolean = false,
 )
 
 /** Lists the phone's English voices, Australian first. */
@@ -36,12 +38,18 @@ object VoiceCatalog {
                 .thenBy { it.label },
         )
 
+    /** The natural (Kokoro) voices, for when they're installed. */
+    fun naturalOptions(): List<VoiceOption> = KokoroVoices.all.map { v ->
+        VoiceOption(v.optionName, v.label, if (v.british) "GB" else "US", offline = true, quality = 500, natural = true)
+    }
+
     fun defaultVoice(options: List<VoiceOption>): VoiceOption? =
-        options.firstOrNull { it.country == "AU" && it.offline }
+        options.firstOrNull { it.name == KokoroVoices.default.optionName }
+            ?: options.firstOrNull { it.country == "AU" && it.offline }
             ?: options.firstOrNull { it.country == "AU" }
             ?: options.firstOrNull()
 
-    fun hasAustralian(options: List<VoiceOption>) = options.any { it.country == "AU" }
+    fun hasAustralian(options: List<VoiceOption>) = options.any { it.country == "AU" && !it.natural }
 
     /** "en-au-x-aub-local" -> "Australian · Voice B · offline". */
     fun label(name: String, country: String, offline: Boolean): String {

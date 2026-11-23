@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.faradaymicrosystems.nobodygenerator.R
 import com.faradaymicrosystems.nobodygenerator.UiState
 import com.faradaymicrosystems.nobodygenerator.service.JobState
+import com.faradaymicrosystems.nobodygenerator.tts.KokoroModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -60,6 +61,9 @@ fun CreateScreen(
     onDismiss: () -> Unit,
     onOpenLibrary: () -> Unit,
     onGetVoices: () -> Unit,
+    onDownloadNatural: () -> Unit,
+    onCancelNatural: () -> Unit,
+    onRemoveNatural: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val running = job is JobState.Running
@@ -84,7 +88,7 @@ fun CreateScreen(
                 }
             }
         }
-        if (ui.engineReady && ui.voices.isNotEmpty() && !ui.hasAustralian) {
+        if (ui.engineReady && ui.voices.isNotEmpty() && !ui.hasAustralian && !ui.naturalSelected) {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
                 Column(Modifier.padding(16.dp)) {
                     Text("No Australian voice installed yet.", style = MaterialTheme.typography.titleSmall)
@@ -163,13 +167,23 @@ fun CreateScreen(
                         }
                     }
                 }
+                NaturalVoicesSection(ui.natural, running, onDownloadNatural, onCancelNatural, onRemoveNatural)
                 SpeedControl(value = ui.rate, onChange = onRate, range = 0.5f..2.0f, enabled = !running)
-                Text("Pitch  ${"%.2f".format(ui.pitch)}", style = MaterialTheme.typography.bodyMedium)
-                Slider(value = ui.pitch, onValueChange = onPitch, valueRange = 0.6f..1.6f, steps = 9, enabled = !running)
-                OutlinedButton(onClick = onPreview, enabled = ui.engineReady && !running) {
+                Text(
+                    if (ui.naturalSelected) "Pitch (phone voices only)" else "Pitch  ${"%.2f".format(ui.pitch)}",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Slider(
+                    value = ui.pitch,
+                    onValueChange = onPitch,
+                    valueRange = 0.6f..1.6f,
+                    steps = 9,
+                    enabled = !running && !ui.naturalSelected,
+                )
+                OutlinedButton(onClick = onPreview, enabled = ui.engineReady && !running && !ui.previewing) {
                     Icon(painterResource(R.drawable.ic_play), contentDescription = null)
                     Spacer(Modifier.width(6.dp))
-                    Text("Hear a sample")
+                    Text(if (ui.previewing) "Preparing sample…" else "Hear a sample")
                 }
             }
         }
@@ -236,5 +250,51 @@ fun CreateScreen(
             Text("Go", style = MaterialTheme.typography.titleMedium)
         }
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+/** Download / progress / remove controls for the offline natural (Kokoro) voices. */
+@Composable
+private fun NaturalVoicesSection(
+    state: KokoroModel.State,
+    running: Boolean,
+    onDownload: () -> Unit,
+    onCancel: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val hint = MaterialTheme.colorScheme.onSurfaceVariant
+    when (state) {
+        KokoroModel.State.NotInstalled -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                "Want a more natural voice? Download the offline AI voices (about ${KokoroModel.DOWNLOAD_MB} MB, " +
+                    "Wi-Fi recommended). British and American accents; there's no Australian one yet.",
+                style = MaterialTheme.typography.bodySmall,
+                color = hint,
+            )
+            FilledTonalButton(onClick = onDownload, enabled = !running) { Text("Download natural voices") }
+        }
+        is KokoroModel.State.Downloading -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                "Downloading natural voices… ${state.done / 1_000_000} of ${state.total / 1_000_000} MB",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            LinearProgressIndicator(
+                progress = { if (state.total > 0) state.done.toFloat() / state.total else 0f },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text("You can leave the app; it keeps going.", style = MaterialTheme.typography.bodySmall, color = hint)
+            TextButton(onClick = onCancel) { Text("Cancel") }
+        }
+        is KokoroModel.State.Installing -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Setting up natural voices…", style = MaterialTheme.typography.bodySmall)
+            LinearProgressIndicator(progress = { state.fraction }, modifier = Modifier.fillMaxWidth())
+        }
+        is KokoroModel.State.Failed -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(state.message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            FilledTonalButton(onClick = onDownload, enabled = !running) { Text("Try again") }
+        }
+        KokoroModel.State.Ready -> TextButton(onClick = onRemove, enabled = !running) {
+            Text("Remove natural voices (frees about 370 MB)")
+        }
     }
 }

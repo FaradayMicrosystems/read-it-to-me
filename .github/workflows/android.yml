@@ -1,6 +1,7 @@
 name: Build APK
 
-# Every push to main builds the APK and publishes a full release (v<baseVersion>).
+# Every push to main builds the APK, runs the on-device tests, and only if both pass
+# publishes a full release (v<baseVersion>).
 on:
   push:
     branches: [main]
@@ -16,6 +17,10 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.apk.outputs.tag }}
+      name: ${{ steps.apk.outputs.name }}
+      file: ${{ steps.apk.outputs.file }}
     env:
       NOBODY_CHANNEL: release
       NOBODY_KS_PASS: ${{ secrets.NOBODY_KS_PASS }}
@@ -79,14 +84,25 @@ jobs:
           name: ${{ steps.apk.outputs.file }}
           path: ${{ steps.apk.outputs.file }}
 
+  device-tests:
+    uses: ./.github/workflows/device-tests.yml
+
+  publish:
+    needs: [build, device-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.file }}
+
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.apk.outputs.tag }}
-          name: ${{ steps.apk.outputs.name }}
+          tag_name: ${{ needs.build.outputs.tag }}
+          name: ${{ needs.build.outputs.name }}
           target_commitish: ${{ github.sha }}
           make_latest: true
-          files: ${{ steps.apk.outputs.file }}
+          files: ${{ needs.build.outputs.file }}
           body: |
-            Built from `${{ github.ref_name }}` @ ${{ github.sha }}.
+            Built from `${{ github.ref_name }}` @ ${{ github.sha }}. Passed the on-device tests.
             On your phone: tap the .apk below, then allow "Install unknown apps" for your browser if asked.

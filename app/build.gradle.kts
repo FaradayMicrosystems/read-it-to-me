@@ -1,3 +1,6 @@
+import java.net.URI
+import java.security.MessageDigest
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -10,9 +13,40 @@ plugins {
 val versionCodeOffset = 1000
 val buildNumber = versionCodeOffset + (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
 val channel = System.getenv("NOBODY_CHANNEL") ?: "release"
-val baseVersion = "0.1.2"
+val baseVersion = "0.2.0"
 
 val keystoreFile = file("nobody.jks")
+
+// Offline neural voices (Kokoro) run on sherpa-onnx. Pinned to 1.13.8: the 2.0.x releases
+// silently drop any word missing from Kokoro's dictionary (names, numbers), so don't bump
+// without re-running the on-device Kokoro test. The AAR is fetched once and hash-checked.
+val sherpaVersion = "1.13.8"
+val sherpaSha256 = "633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96"
+val sherpaAar = file("libs/sherpa-onnx-$sherpaVersion.aar")
+
+fun sha256(f: File): String = MessageDigest.getInstance("SHA-256").let { md ->
+    f.inputStream().use { input ->
+        val buf = ByteArray(1 shl 16)
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            md.update(buf, 0, n)
+        }
+    }
+    md.digest().joinToString("") { "%02x".format(it) }
+}
+
+if (!sherpaAar.exists() || sha256(sherpaAar) != sherpaSha256) {
+    sherpaAar.parentFile.mkdirs()
+    val part = File(sherpaAar.path + ".part")
+    val url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/v$sherpaVersion/sherpa-onnx-$sherpaVersion.aar"
+    logger.lifecycle("Downloading $url")
+    URI(url).toURL().openStream().use { input -> part.outputStream().use { input.copyTo(it) } }
+    val got = sha256(part)
+    check(got == sherpaSha256) { "sherpa-onnx AAR hash mismatch: $got" }
+    sherpaAar.delete()
+    check(part.renameTo(sherpaAar)) { "Couldn't move ${part.name} into place" }
+}
 
 android {
     namespace = "com.faradaymicrosystems.nobodygenerator"
@@ -27,8 +61,9 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+        // Phones only; x86_64 (emulator) is added for debug builds below.
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
         }
     }
 
@@ -44,6 +79,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            ndk {
+                abiFilters += "x86_64"
+            }
+        }
         release {
             isMinifyEnabled = false
             signingConfig = if (keystoreFile.exists()) {
@@ -101,6 +141,10 @@ dependencies {
     implementation("org.commonmark:commonmark-ext-gfm-tables:0.24.0")
     implementation("org.jsoup:jsoup:1.18.3")
     implementation("net.dankito.readability4j:readability4j:1.0.8")
+
+    // Offline neural voices
+    implementation(files(sherpaAar))
+    implementation("org.apache.commons:commons-compress:1.27.1")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
