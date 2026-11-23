@@ -1,0 +1,85 @@
+name: Build APK
+
+# experimental branch -> pre-release ("experimental") builds only
+# main branch         -> full releases only
+on:
+  push:
+    branches: [experimental, main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NOBODY_CHANNEL: ${{ github.ref_name == 'main' && 'release' || 'exp' }}
+      NOBODY_KS_PASS: ${{ secrets.NOBODY_KS_PASS }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+
+      - name: Restore signing key
+        env:
+          KS_B64: ${{ secrets.NOBODY_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > app/nobody.jks
+            echo "Signing with the NobodyGenerator key"
+          else
+            echo "::warning::No signing key secret set; using a throwaway debug key (updates won't install over each other)"
+          fi
+
+      - name: Unit tests
+        run: gradle --no-daemon testReleaseUnitTest
+
+      - name: Build APK
+        run: gradle --no-daemon assembleRelease
+
+      - name: Name the APK
+        id: apk
+        run: |
+          if [ "$NOBODY_CHANNEL" = "release" ]; then
+            TAG="v0.1.0-build${GITHUB_RUN_NUMBER}"
+            NAME="NobodyGenerator ${TAG}"
+          else
+            TAG="exp-${GITHUB_RUN_NUMBER}"
+            NAME="Experimental build ${GITHUB_RUN_NUMBER}"
+          fi
+          cp app/build/outputs/apk/release/app-release.apk "NobodyGenerator-${TAG}.apk"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "file=NobodyGenerator-${TAG}.apk" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.file }}
+          path: ${{ steps.apk.outputs.file }}
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.apk.outputs.tag }}
+          name: ${{ steps.apk.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ env.NOBODY_CHANNEL != 'release' }}
+          make_latest: ${{ env.NOBODY_CHANNEL == 'release' }}
+          files: ${{ steps.apk.outputs.file }}
+          body: |
+            Built from `${{ github.ref_name }}` @ ${{ github.sha }}.
+            On your phone: tap the .apk below, then allow "Install unknown apps" for your browser if asked.
