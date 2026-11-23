@@ -1,10 +1,9 @@
 name: Build APK
 
-# experimental branch -> pre-release ("experimental") builds only
-# main branch         -> full releases only
+# Every push to main builds the APK and publishes a full release (v<baseVersion>).
 on:
   push:
-    branches: [experimental, main]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -18,7 +17,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      NOBODY_CHANNEL: ${{ github.ref_name == 'main' && 'release' || 'exp' }}
+      NOBODY_CHANNEL: release
       NOBODY_KS_PASS: ${{ secrets.NOBODY_KS_PASS }}
     steps:
       - uses: actions/checkout@v4
@@ -52,14 +51,9 @@ jobs:
       - name: Name the APK
         id: apk
         run: |
-          if [ "$NOBODY_CHANNEL" = "release" ]; then
-            VERSION=$(sed -n 's/^val baseVersion = "\(.*\)"/\1/p' app/build.gradle.kts)
-            TAG="v${VERSION}"
-            NAME="Read It To Me ${TAG}"
-          else
-            TAG="exp-${GITHUB_RUN_NUMBER}"
-            NAME="Experimental build ${GITHUB_RUN_NUMBER}"
-          fi
+          VERSION=$(sed -n 's/^val baseVersion = "\(.*\)"/\1/p' app/build.gradle.kts)
+          TAG="v${VERSION}"
+          NAME="Read It To Me ${TAG}"
           cp app/build/outputs/apk/release/app-release.apk "ReadItToMe-${TAG}.apk"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
@@ -76,8 +70,7 @@ jobs:
           tag_name: ${{ steps.apk.outputs.tag }}
           name: ${{ steps.apk.outputs.name }}
           target_commitish: ${{ github.sha }}
-          prerelease: ${{ env.NOBODY_CHANNEL != 'release' }}
-          make_latest: ${{ env.NOBODY_CHANNEL == 'release' }}
+          make_latest: true
           files: ${{ steps.apk.outputs.file }}
           body: |
             Built from `${{ github.ref_name }}` @ ${{ github.sha }}.

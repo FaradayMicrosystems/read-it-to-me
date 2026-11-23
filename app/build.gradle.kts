@@ -6,8 +6,8 @@ plugins {
 
 // CI passes the run number so every build installs over the previous one.
 val buildNumber = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
-val channel = System.getenv("NOBODY_CHANNEL") ?: "exp"
-val baseVersion = "0.1.0"
+val channel = System.getenv("NOBODY_CHANNEL") ?: "release"
+val baseVersion = "0.1.1"
 
 val keystoreFile = file("nobody.jks")
 

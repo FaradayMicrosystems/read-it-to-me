@@ -3,7 +3,7 @@ name: On-device tests
 # Runs the real speech engine, MP3 encoder and PDF reader on an Android emulator.
 on:
   push:
-    branches: [experimental]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:

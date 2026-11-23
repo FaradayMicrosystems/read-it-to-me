@@ -1,6 +1,6 @@
 # Read It To Me (formerly NobodyGenerator) — Project Proposal (v2: Android app)
 
-**Status:** In progress · **Branch:** `experimental` · **Updated:** 2026-11-23
+**Status:** In progress · **Branch:** `main` · **Updated:** 2026-11-23
 
 > v1 of this proposal (a Linux desktop/CLI voice engine) has been replaced by this one.
 > Direction now: a simple Android app.
@@ -51,8 +51,7 @@ document ─▶ reader (PDF / Markdown / article / text) ─▶ clean segments
 
 ## 5. Branches, builds and releases
 
-- **`experimental`:** experimental builds only. Every push builds an APK on GitHub and publishes it as a **pre-release** (`exp-N`).
-- **`main`:** full releases only, merged from `experimental` after sign-off. Every push publishes a full release.
+- **`main` only:** no experimental branch. Updates go straight to `main`; every push builds an APK on GitHub and publishes a release (`v<version>`). Bump the version with each update.
 - Claude does the merges.
 - Install on your phone from the repo's **Releases** page: tap the `.apk`.
 
@@ -65,7 +64,7 @@ document ─▶ reader (PDF / Markdown / article / text) ─▶ clean segments
 
 | Version | Branch | Deliverable |
 |---|---|---|
-| 0.1.0-exp | experimental | Add document/link/text → Go → notification → play/save/share MP3; Australian default voice |
-| 0.2.0-exp | experimental | Fixes from your on-phone testing; reading position / resume; better PDF table handling |
+| 0.1.0 | main | Add document/link/text → Go → notification → play/save/share MP3; Australian default voice |
+| 0.2.0 | main | Fixes from your on-phone testing; reading position / resume; better PDF table handling |
 | **1.0.0** | **main** | First full release after your sign-off |
-| later | experimental → main | Optional extras (EPUB/DOCX, queue several documents, chapter markers) |
+| later | main | Optional extras (EPUB/DOCX, queue several documents, chapter markers) |

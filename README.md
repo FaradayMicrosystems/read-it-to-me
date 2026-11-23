@@ -12,7 +12,7 @@ An Android app that reads your documents aloud and gives you an MP3.
 ## Install
 
 Open this repo's **[Releases](../../releases)** page on your phone and tap the latest `.apk`.
-Experimental builds are marked *Pre-release*; full releases come from `main`.
+Every update is pushed straight to `main` and published as a new release.
 
 If there's no Australian voice: **Settings → Accessibility → Text-to-speech → Speech Services by Google ⚙ → Install voice data → English (Australia)**.
 
